@@ -15,7 +15,7 @@ GPIO1:LEV 1 (to drive a high value to PA10)
 
 SOURC1:VOLT:LEV 1.2 (drive the DAC pin PA02 to a value of 1.2V)
 
-The DAC has some sort of issue when the USB is activel. I have tried giving it a separate GLCK and enabled it while in sleep, but there is either something in the tinyusb code or a hardware bug in the SAMD which creates this issue. I saw online another person who was using the SAMD21 to send USB data to be output on the DAC and they had a similar issue. I have tried the DAC hardware register writes separate to the usbtmc example and it works just fine.
+The DAC has some sort of issue when the USB is active. I have tried giving it a separate GLCK and enabled it while in sleep, but there is either something in the tinyusb code or a hardware bug in the SAMD which creates this issue. I saw online another person who was using the SAMD21 to send USB data to be output on the DAC and they had a similar issue. I have tried the DAC hardware register writes separate to the usbtmc example and it works just fine.
 
 My C string parsing is very crude so the SCPI command must match what I have listed above (or be in lowercase).
 All the major credit goes to the tinyusb usbtmc author, and my contribution was helping to find a bug in the code to allow the SAMD MCUs to properly run the example. 

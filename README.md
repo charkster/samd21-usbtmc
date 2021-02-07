@@ -1,6 +1,6 @@
 # samd21-usbtmc
 SAMD21's ADC, DAC and GPIO are controllable with custom SCPI commands. World's smallest lab equipment.
-The seeeduino_xiao_usbtmc.uf2 file was created using the tinyusb usbtmc device example. I just made some minor changes to the main.c, usbtmc_app.c and usbtmc_app.h files to create this proof of concept. The DAC pin in PA02, ADC pin is PA04 and GPIO pin is PA10. A Seeeduino Xiao or Adafruit QT PY can be flashed with the included UF2 file and they should just work.
+The seeeduino_xiao_usbtmc.uf2 file was created using the tinyusb usbtmc device example. I just made some minor changes to the main.c, usbtmc_app.c and usbtmc_app.h files to create this proof of concept. The DAC pin is PA02, ADC pin is PA04 and GPIO pin is PA10. A Seeeduino Xiao or Adafruit QT PY can be flashed with the included UF2 file and they should just work.
 Here are the supported SCPI commands:
 
 *IDN

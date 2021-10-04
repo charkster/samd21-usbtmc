@@ -194,7 +194,7 @@ bool tud_usbtmc_msg_data_cb(void *data, size_t len, bool transfer_complete)
   {
     dac_cmd = true;
     char *ptr_value    = get_value(data);
-    float dac_voltage  = strtof(ptr_value,data);
+    float dac_voltage  = strtof(ptr_value,NULL); // strtof(const char* str, char **endptr)
     uint16_t dac_value = (int)( (dac_voltage / DAC_REF_VOLTAGE) * DAC_MAX_VALUE );
     DAC->DATA.reg = dac_value;
   }

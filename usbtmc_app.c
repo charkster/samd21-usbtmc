@@ -472,10 +472,9 @@ void dac_setup(void) {
   PORT->Group[0].PINCFG[2].reg  = PORT_PINCFG_PMUXEN; // PA02 as peripheral
   PORT->Group[0].PMUX[1].reg   |= PORT_PMUX_PMUXE_B;  // PA02 as function B, analog
 
-  DAC->CTRLA.reg = DAC_CTRLA_ENABLE  |             // Enable DAC
-                   DAC_CTRLA_RUNSTDBY;             // DAC can run in standby
-  DAC->INTENCLR.reg = 0xFF;                        // clear all interrupts
-
+  DAC->CTRLB.reg |= DAC_CTRLB_EOEN |               // external pin enable
+                    DAC_CTRLB_REFSEL_AVCC;         // use 3.3V
+  DAC->CTRLA.reg  = DAC_CTRLA_ENABLE;              // Enable DAC
   while (DAC->STATUS.bit.SYNCBUSY);                // Wait for synchronization
 }
 

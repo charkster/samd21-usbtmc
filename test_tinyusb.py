@@ -1,0 +1,18 @@
+import pyvisa
+rm = pyvisa.ResourceManager('@py')
+print(rm.list_resources())
+samd21 = rm.open_resource('USB0::51966::16384::123456::0::INSTR')
+print(samd21.query("*IDN?"))
+print(samd21.query("SENS1:VOLT?"))
+samd21.write("GPIO1:LEV 1")
+print(samd21.query("GPIO1:LEV?"))
+samd21.write("GPIO1:DIR IN")
+print(samd21.query("GPIO1:DIR?"))
+print(samd21.query("GPIO1:LEV?"))
+samd21.write("GPIO1:DIR OUT")
+print(samd21.query("GPIO1:DIR?"))
+print(samd21.query("GPIO1:LEV?"))
+samd21.write("SOURC1:VOLT:LEV 2.0")
+print(samd21.query("SOURC1:VOLT:LEV?"))
+samd21.write("*RST")
+

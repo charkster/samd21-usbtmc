@@ -30,13 +30,16 @@
 #define DAC_REF_VOLTAGE 3.3
 #define ADC_MAX_VALUE   4096 // 12bit value
 #define ADC_REF_VOLTAGE 3.3
-#define IDN             "Seeeduino Xiao\n"
+#define IDN             "SAMD21"
 #define IDN_QUERY       "*idn?"
 #define RST_CMD         "*rst"
 #define DAC_CMD         "sourc1:volt:lev " // SOURCe1:VOLTage:LEVel
 #define DAC_QUERY       "sourc1:volt:lev?" // SOURCe1:VOLTage:LEVel
 #define ADC_QUERY       "sens1:volt?"      // SENSe1:VOLTage
-#define GPIO_CMD        "gpio1:lev "       // GPIO1:LEVel
+#define GPIO_LEV_CMD    "gpio1:lev "       // GPIO1:LEVel
+#define GPIO_LEV_QUERY  "gpio1:lev?"       // GPIO1:LEVel
+#define GPIO_DIR_CMD    "gpio1:dir "       // GPIO1:DIRection
+#define GPIO_DIR_QUERY  "gpio1:dir?"       // GPIO1:DIRection
 #define END_RESPONSE    "\n"               // USB488
 
 #include <strings.h>
@@ -102,18 +105,25 @@ static volatile uint16_t queryState = 0;
 static volatile uint32_t queryDelayStart;
 static volatile uint32_t bulkInStarted;
 
-static volatile bool     idnQuery;
-static volatile bool     rst_cmd;
-static volatile bool     dac_cmd;
-static volatile bool     adc_query;
-static volatile bool     gpio_cmd;
+static volatile bool idnQuery;
+static volatile bool rst_cmd;
+static volatile bool dac_cmd;
+static volatile bool dac_query;
+static volatile bool adc_query;
+static volatile bool gpio_lev_cmd;
+static volatile bool gpio_lev_query;
+static volatile bool gpio_dir_cmd;
+static volatile bool gpio_dir_query;
 
 static uint32_t resp_delay = 125u; // Adjustable delay, to allow for better testing
 static size_t   buffer_len;
 static size_t   buffer_tx_ix;      // for transmitting using multiple transfers
 static uint8_t  buffer[225];       // A few packets long should be enough.
 
-char adc_voltage_str[25]; 
+char adc_voltage_str[10];
+char dac_voltage_str[10];
+char gpio_lev_str[2];
+char gpio_dir_str[5];
 
 
 static usbtmc_msg_dev_dep_msg_in_header_t rspMsg = {
@@ -173,14 +183,19 @@ bool tud_usbtmc_msg_data_cb(void *data, size_t len, bool transfer_complete)
   {
     return false; // buffer overflow!
   }
-  queryState = transfer_complete;
-  idnQuery  = false;
-  rst_cmd   = false;
-  dac_cmd   = false;
-  adc_query = false;
-  gpio_cmd  = false;
 
-  if(transfer_complete && (len >=4) && !strncasecmp(IDN_QUERY,data,4))
+  queryState     = transfer_complete;
+  idnQuery       = false;
+  rst_cmd        = false;
+  dac_cmd        = false;
+  dac_query      = false;
+  adc_query      = false;
+  gpio_lev_cmd   = false;
+  gpio_lev_query = false;
+  gpio_dir_cmd   = false;
+  gpio_dir_query = false;
+
+  if(transfer_complete && (len >=4) && !strncasecmp(IDN_QUERY,data,5))
   {
     idnQuery = true;
   }
@@ -188,27 +203,33 @@ bool tud_usbtmc_msg_data_cb(void *data, size_t len, bool transfer_complete)
   {
     rst_cmd = true;
     DAC->DATA.reg = 0x0000;                // clear DAC value
+    PORT->Group[0].DIRSET.reg = PORT_PA10; // PA10 as output
     PORT->Group[0].OUTCLR.reg = PORT_PA10; // drive low value
   }
   else if (transfer_complete && (len >=16) && !strncasecmp(DAC_CMD,data,16))
   {
-    dac_cmd = true;
+    dac_cmd            = true;
     char *ptr_value    = get_value(data);
-    float dac_voltage  = strtof(ptr_value,NULL); // strtof(const char* str, char **endptr)
+    float dac_voltage  = strtof(ptr_value,NULL);
     uint16_t dac_value = (int)( (dac_voltage / DAC_REF_VOLTAGE) * DAC_MAX_VALUE );
     DAC->DATA.reg = dac_value;
   }
-  else if (transfer_complete && (len >=10) && !strncasecmp(ADC_QUERY,data,10))
+  else if (transfer_complete && (len >= 16) && !strncasecmp(DAC_QUERY,data,16))
   {
-    adc_query = true;
-    float adc_voltage =(float)(adc_get_sample()) / ADC_MAX_VALUE * ADC_REF_VOLTAGE;
-    //float adc_voltage = 1.2333333;
-    ftoa(adc_voltage,adc_voltage_str);
-    strcat(adc_voltage_str,"\n");
+    dac_query = true;
+    float dac_voltage = (float)(DAC->DATA.reg) * (DAC_REF_VOLTAGE / DAC_MAX_VALUE);
+    ftoa(dac_voltage,dac_voltage_str);
+//    strcat(dac_voltage_str,"\n");
   }
-  else if (transfer_complete && (len >=10) && !strncasecmp(GPIO_CMD,data,10))
+  else if (transfer_complete && (len >= 11) && !strncasecmp(ADC_QUERY,data,11))
   {
-    gpio_cmd = true;
+    adc_query         = true;
+    float adc_voltage =(float)(adc_get_sample()) / ADC_MAX_VALUE * ADC_REF_VOLTAGE;
+    ftoa(adc_voltage,adc_voltage_str);
+  }
+  else if (transfer_complete && (len >= 10) && !strncasecmp(GPIO_LEV_CMD,data,10))
+  {
+    gpio_lev_cmd = true;
     char *ptr_value = get_value(data);
     int gpio_level = atoi(ptr_value);
     if (gpio_level == 1)
@@ -220,6 +241,44 @@ bool tud_usbtmc_msg_data_cb(void *data, size_t len, bool transfer_complete)
       PORT->Group[0].OUTCLR.reg = PORT_PA10; // drive low value
     }
   }
+  else if (transfer_complete && (len >= 10) && !strncasecmp(GPIO_LEV_QUERY,data,10))
+  {
+    gpio_lev_query = true;
+    if ((PORT->Group[0].IN.reg & PORT_PA10) || ((PORT->Group[0].DIR.reg & PORT_PA10) && (PORT->Group[0].OUT.reg & PORT_PA10)))
+    {
+      strcpy(gpio_lev_str,"1");
+    }
+    else
+    {
+      strcpy(gpio_lev_str,"0");
+    }
+  }
+  else if (transfer_complete && (len >= 10) && !strncasecmp(GPIO_DIR_CMD,data,10))
+  {
+    gpio_dir_cmd    = true;
+    char *ptr_value = get_value(data);
+    if (!strncasecmp("IN",ptr_value,2))
+    {
+      PORT->Group[0].DIRCLR.reg = PORT_PA10; // PA10 as input
+    }
+    else if (!strncasecmp("OUT",ptr_value,3))
+    {
+      PORT->Group[0].DIRSET.reg = PORT_PA10; // PA10 as output
+    }
+  }
+  else if (transfer_complete && (len >= 10) && !strncasecmp(GPIO_DIR_QUERY,data,10))
+  {
+    gpio_dir_query = true;
+    if (PORT->Group[0].DIR.reg & PORT_PA10)
+    {
+      strcpy(gpio_dir_str,"OUT");
+    }
+    else
+    {
+      strcpy(gpio_dir_str,"IN");
+    }
+  }
+
   if(transfer_complete && !strncasecmp("delay ",data,5))
   {
     queryState = 0;
@@ -308,15 +367,33 @@ void usbtmc_app_task_iter(void) {
         queryState    = 0;
         bulkInStarted = 0;
       }
-      else if (rst_cmd || dac_cmd || gpio_cmd)
-      { 
-        tud_usbtmc_transmit_dev_msg_data(END_RESPONSE, tu_min32(sizeof(END_RESPONSE)-1,msgReqLen),true,false);
+      else if (adc_query)
+      {
+        tud_usbtmc_transmit_dev_msg_data(adc_voltage_str, tu_min32(sizeof(adc_voltage_str)-1,msgReqLen),true,false);
         queryState    = 0;
         bulkInStarted = 0;
       }
-      if(adc_query)
+      else if (dac_query)
       {
-        tud_usbtmc_transmit_dev_msg_data(adc_voltage_str, tu_min32(sizeof(adc_voltage_str)-1,msgReqLen),true,false);
+        tud_usbtmc_transmit_dev_msg_data(dac_voltage_str, tu_min32(sizeof(dac_voltage_str)-1,msgReqLen),true,false);
+        queryState    = 0;
+        bulkInStarted = 0;
+      }
+      else if (gpio_lev_query)
+      {
+        tud_usbtmc_transmit_dev_msg_data(gpio_lev_str, tu_min32(sizeof(gpio_lev_str)-1,msgReqLen),true,false);
+        queryState    = 0;
+        bulkInStarted = 0;
+      }
+      else if (gpio_dir_query)
+      {
+        tud_usbtmc_transmit_dev_msg_data(gpio_dir_str, tu_min32(sizeof(gpio_dir_str)-1,msgReqLen),true,false);
+        queryState    = 0;
+        bulkInStarted = 0;
+      }
+      else if (rst_cmd || dac_cmd || gpio_lev_cmd || gpio_dir_cmd)
+      { 
+        tud_usbtmc_transmit_dev_msg_data(END_RESPONSE, tu_min32(sizeof(END_RESPONSE)-1,msgReqLen),true,false);
         queryState    = 0;
         bulkInStarted = 0;
       }
@@ -325,6 +402,7 @@ void usbtmc_app_task_iter(void) {
         buffer_tx_ix = tu_min32(buffer_len,msgReqLen);
         tud_usbtmc_transmit_dev_msg_data(buffer, buffer_tx_ix, buffer_tx_ix == buffer_len, false);
       }
+
       // MAV is cleared in the transfer complete callback.
     }
     break;
@@ -450,7 +528,7 @@ uint32_t adc_get_sample(void) {
   ADC->SWTRIG.bit.START = true;                    // Use software trigger to start conversion
   while (ADC->INTFLAG.bit.RESRDY == 0);            // wait for results
   ADC->INTFLAG.reg = ADC_INTFLAG_RESRDY;           // clear result flag
-  return ADC->RESULT.reg;
+  return ADC->RESULT.reg * 2.0;
 }
 
 void dac_setup(void) {
@@ -459,22 +537,21 @@ void dac_setup(void) {
   GCLK->GENCTRL.reg = GCLK_GENCTRL_IDC |          // Set the duty cycle to 50/50 HIGH/LOW
                       GCLK_GENCTRL_GENEN |        // Enable GCLK
                       GCLK_GENCTRL_SRC_DFLL48M |  // Set the clock source to 48MHz
-                      GCLK_GENCTRL_RUNSTDBY    |  // Allow clock to run in standby 
-                      GCLK_GENCTRL_ID(3);         // Set clock source on GCLK 6
+                      GCLK_GENCTRL_ID(3);         // Set clock source on GCLK 3
   while (GCLK->STATUS.bit.SYNCBUSY);              // Wait for synchronization
 
   GCLK->CLKCTRL.reg = GCLK_CLKCTRL_CLKEN     |    // enable clock
                       GCLK_CLKCTRL_GEN_GCLK3 |    // enable GCLK3
-                      GCLK_CLKCTRL_ID_DAC;        // DAC will get GCLK3
+                      GCLK_CLKCTRL_ID_DAC;        //
   while (GCLK->STATUS.bit.SYNCBUSY);              // Wait for synchronization
   
   PORT->Group[0].DIRSET.reg     = PORT_PA02;          // PA02 as output
-  PORT->Group[0].PINCFG[2].reg  = PORT_PINCFG_PMUXEN; // PA02 as peripheral
-  PORT->Group[0].PMUX[1].reg   |= PORT_PMUX_PMUXE_B;  // PA02 as function B, analog
+  PORT->Group[0].PINCFG[2].reg |= PORT_PINCFG_PMUXEN; // PA02 as peripheral
+  PORT->Group[0].PMUX[1].reg    = PORT_PMUX_PMUXE_B;  // PA02 as function B, analog
 
   DAC->CTRLB.reg |= DAC_CTRLB_EOEN |               // external pin enable
                     DAC_CTRLB_REFSEL_AVCC;         // use 3.3V
-  DAC->CTRLA.reg  = DAC_CTRLA_ENABLE;              // Enable DAC
+  DAC->CTRLA.reg = DAC_CTRLA_ENABLE;               // Enable DAC
   while (DAC->STATUS.bit.SYNCBUSY);                // Wait for synchronization
 }
 

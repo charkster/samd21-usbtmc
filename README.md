@@ -8,27 +8,27 @@ https://files.seeedstudio.com/wiki/Seeeduino-XIAO/res/Seeeduino-XIAO-v1.0-SCH-19
 
 Here are the supported SCPI commands:
 
-*IDN?               (query the instrument name, returns 'SAMD21')
+*IDN? (query the instrument name, returns 'SAMD21')
 
-*RST                (clears the GPIO to a low value, GPIO direction is output, and DAC set to a zero value)
+*RST (clears the GPIO to a low value, GPIO direction is output, and DAC set to a zero value)
 
-SENS1:VOLT?         (query the ADC's PA04 pin)
+SENS1:VOLT? (query the ADC's PA04 pin)
 
-GPIO1:LEV 0         (drive a low value to PA10)
+GPIO1:LEV 0 (drive a low value to PA10)
 
-GPIO1:LEV 1         (drive a high value to PA10)
+GPIO1:LEV 1 (drive a high value to PA10)
 
-GPIO1:LEV?          (query the level on PA10)
+GPIO1:LEV? (query the level on PA10)
 
-GPIO1:DIR IN        (configure PA10 an input)
+GPIO1:DIR IN (configure PA10 as an input)
 
-GPIO1:DIR OUT       (configure PA10 an output)
+GPIO1:DIR OUT (configure PA10 as an output)
 
-GPIO1:DIR?          (query the PA10 direction)
+GPIO1:DIR? (query the PA10 direction)
 
 SOURC1:VOLT:LEV 1.2 (drive the DAC pin PA02 to a value of 1.2V)
 
-SOURC1:VOLT:LEV?    (query the DAC pin PA02 voltage)
+SOURC1:VOLT:LEV? (query the DAC pin PA02 voltage)
 
 My C string parsing is very crude so the SCPI command must match what I have listed above (or be in lowercase).
 All the major credit goes to the tinyusb usbtmc author, and my contribution was helping to find a bug in the code to allow the SAMD MCUs to properly run the example. 

@@ -1,5 +1,5 @@
 # samd21-usbtmc
-![picture](https://cdn-learn.adafruit.com/guides/cropped_images/000/003/313/medium640/QTRP_top_angle_guide.jpg)
+![picture](https://cdn-learn.adafruit.com/assets/assets/000/095/173/large1024/adafruit_products_QTPy_top.jpg)
 
 
 SAMD21's ADC, DAC and GPIO are controllable with custom SCPI commands. World's smallest lab equipment.

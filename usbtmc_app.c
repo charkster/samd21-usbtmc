@@ -244,7 +244,9 @@ bool tud_usbtmc_msg_data_cb(void *data, size_t len, bool transfer_complete)
   else if (transfer_complete && (len >= 10) && !strncasecmp(GPIO_LEV_QUERY,data,10))
   {
     gpio_lev_query = true;
-    if ((PORT->Group[0].IN.reg & PORT_PA10) || ((PORT->Group[0].DIR.reg & PORT_PA10) && (PORT->Group[0].OUT.reg & PORT_PA10)))
+    
+//    if ((PORT->Group[0].IN.reg == PORT_PA10) || ((PORT->Group[0].DIR.reg & PORT_PA10) && (PORT->Group[0].OUT.reg & PORT_PA10)))
+    if (PORT->Group[0].IN.reg & PORT_PA10)
     {
       strcpy(gpio_lev_str,"1");
     }
@@ -259,7 +261,8 @@ bool tud_usbtmc_msg_data_cb(void *data, size_t len, bool transfer_complete)
     char *ptr_value = get_value(data);
     if (!strncasecmp("IN",ptr_value,2))
     {
-      PORT->Group[0].DIRCLR.reg = PORT_PA10; // PA10 as input
+      PORT->Group[0].DIRCLR.reg     = PORT_PA10;        // PA10 as input
+    //  PORT->Group[0].PINCFG[10].reg = PORT_PINCFG_INEN; // Enable input
     }
     else if (!strncasecmp("OUT",ptr_value,3))
     {
@@ -551,6 +554,8 @@ void dac_setup(void) {
 
   DAC->CTRLB.reg |= DAC_CTRLB_EOEN |               // external pin enable
                     DAC_CTRLB_REFSEL_AVCC;         // use 3.3V
+  uint16_t dac_value = (int)( (1.01 / DAC_REF_VOLTAGE) * DAC_MAX_VALUE );
+  DAC->DATA.reg = dac_value;
   DAC->CTRLA.reg = DAC_CTRLA_ENABLE;               // Enable DAC
   while (DAC->STATUS.bit.SYNCBUSY);                // Wait for synchronization
 }
@@ -558,6 +563,7 @@ void dac_setup(void) {
 void gpio_setup(void) {
   PORT->Group[0].DIRSET.reg     = PORT_PA10;          // PA10 as output
   PORT->Group[0].OUTCLR.reg     = PORT_PA10;          // PA10 initialized low
+  PORT->Group[0].PINCFG[10].reg = PORT_PINCFG_INEN;   // input enable
 }
 
 char * get_value(char *in_string) {
